@@ -17,16 +17,28 @@ body {
 #messages {
     height : 400px;
     width : 100%;
+    overflow: hidden;
+}
+
+#messages div {
+    height: 20px;
 }
 
 #actions {
-    height : 400px;
-    width : 100%;
+    height: 400px;
+    width: 50%;
+    float: left;
 }
 
 #objects{
     float : left;
     width : 25%;
+}
+
+#options {
+    height: 400px;
+    width: 50%;
+    float: left;
 }
 
 .object {
@@ -61,7 +73,7 @@ body {
 }
 
 .day {
-    width : 110px;
+    width : 115px;
 }
 
 .money {

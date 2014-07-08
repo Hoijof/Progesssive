@@ -57,18 +57,29 @@ function getJobDescription() {
     return "Work in the farm";
 }
 
-function addJobToActions (time) {
+function addJobToActions (time, cost) {
     actions.jobs.push( {
         name : getJobDescription(),
             value : time,
             salary : 10,
             repercussion : 4,
+            cost   : cost,
             active : true,
             special : function (key) {
+                var time = actions.jobs[key].cost - 1;
 
-                addContentToTerminal("You work and earn your paycheck of " + actions.jobs[key].value + " coins");
+                while(time > 0) {
+                    update();
+                    time--;
+                }
+
+                karma += actions.jobs[key].repercussion;
                 money += actions.jobs[key].salary;
-                actions.jobs[key].value -= 0.25;
+
+                actions.jobs[key].value -= 0.25 * actions.jobs[key].cost;
+
+                addContentToTerminal("You work and earn your paycheck of " + actions.jobs[key].salary + " coins");
+
                 if (actions.jobs[key].value <= 0) actions.jobs[key] = undefined;
     }
         });
@@ -203,7 +214,9 @@ function update () {
     selector.append("~~JOBS~~");
 
     $.each(actions.jobs, function(key, value) {
-        if (actions.jobs[key].active) selector.append(insertJob(key));
+        if (typeof value !== 'undefined') {
+            if (actions.jobs[key].active) selector.append(insertJob(key));
+        }
     });
 
     // list options
@@ -242,16 +255,7 @@ function perform(key) {
 }
 
 function performJob (key){
-    var time = actions.jobs[key].value;
-
-    while(time > 0) {
-        update();
-        time -= 0.25;
-    }
-
-    karma += actions.jobs[key].repercussion;
     actions.jobs[key].special(key);
-    money += actions.jobs[key].salary;
 }
 
 function end () {
@@ -335,7 +339,7 @@ $(document).ready(function(){
 
     $(document).keypress(function(e){
         if (e.keyCode === 32) { // space key
-
+            update();
             return false;
         }
 

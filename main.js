@@ -12,7 +12,7 @@ function insertObject (key) {
 
     html += "<div class='object' value='"+key+"'>"+objects[key].name+" x " + objects[key].quantity;
     if (objects[key].cost > 0) html += " | <span class='buy'> Buy one for " + parseInt(objects[key].cost) + "</span>";
-    if (objects[key].quantity > 0 && objects[key].cost > 0) html += "<span class='sell'> | Sell one for " + parseInt(objects[key].cost*0.65) +" </span>";
+    if (objects[key].quantity > 0 && objects[key].cost > 0) html += "<span class='sell'> | Sell one for " + parseInt(objects[key].scale) +" </span>";
 
     if (objects[key].rent > 0) html += " | Rent of " + objects[key].rent + " per day ";
     html += "</div>";
@@ -26,6 +26,52 @@ function insertAction (key) {
     html += "<div class='action' value='"+key+"'>"+actions[key].name + "</div>";
 
     return html;
+}
+
+function insertJob (key) {
+    var html = "";
+
+    html += "<div class='job' value='"+key+"'>"+actions.jobs[key].name + "</div>";
+
+    return html;
+}
+
+function toJail(time) {
+    var timex = time*4;
+    while(timex > 0){
+        update();
+        timex--;
+    }
+    addContentToTerminal("You've been " + time + " days in jail. Learn from this.");
+}
+function loseEverything() {
+    objects.kid.quantity = 0;
+    objects.enslavedKid.quantity = 0;
+    objects.clothes.quantity = 1;
+    objects.bag.quantity = 0;
+    objects.basicGun.quantity = 0;
+    objects.policeUniform.quantity = 0;
+}
+
+function getJobDescription() {
+    return "Work in the farm";
+}
+
+function addJobToActions (time) {
+    actions.jobs.push( {
+        name : getJobDescription(),
+            value : time,
+            salary : 10,
+            repercussion : 4,
+            active : true,
+            special : function (key) {
+
+                addContentToTerminal("You work and earn your paycheck of " + actions.jobs[key].value + " coins");
+                money += actions.jobs[key].salary;
+                actions.jobs[key].value -= 0.25;
+                if (actions.jobs[key].value <= 0) actions.jobs[key] = undefined;
+    }
+        });
 }
 
 function insertOption (key) {
@@ -52,6 +98,7 @@ function addContentToTerminal(text) {
 }
 
 function callADay() {
+    addContentToTerminal("###################");
     // Pay rents
     var totalRent = 0;
     $.each(objects, function(key, value) {
@@ -85,29 +132,60 @@ function checkActions () {
     }
 }
 
-function checkOptions () {
-    if (objects.kid.quantity > 0) {
-        options.useChildren.active = true;
+function checkOneOption(object, option) {
+    if (object.quantity > 0) {
+        option.active = true;
     } else {
-        options.useChildren.active = false;
+        option.active = false;
+        option.checked = false;
     }
+}
 
-    if (objects.enslavedKid.quantity > 0) {
-        options.useEnslavedKids.active = true;
-    } else {
-        options.useEnslavedKids.active = false;
-    }
+function checkOptions () {
+    checkOneOption(objects.kid, options.useChildren);
+    checkOneOption(objects.enslavedKid, options.useEnslavedKids);
+    checkOneOption(objects.basicGun, options.useWeapons);
+    checkOneOption(objects.policeUniform, options.usePoliceUniform);
 }
 
 function updateObjects () {
     $.each(objects, function(key, value) {
+        if (value.quantity < 0){
+            value.quantity = 0;
+            value.value = value.iniCost;
+        }
+
         if (value.quantity > 0) value.active = true;
     });
+}
+
+function getWorkers() {
+    var totalWorkers = 0;
+
+    if (objects.kid.quantity && options.useChildren.checked) totalWorkers += objects.kid.quantity;
+    if (objects.enslavedKid.quantity && options.useEnslavedKids.checked) totalWorkers += objects.enslavedKid.quantity;
+
+    return totalWorkers;
+}
+
+function pointsPerObjects() {
+    var totalPoints = 0, i;
+    if (objects.basicGun.quantity && options.useWeapons.checked) {
+        for (i = 0; i < objects.basicGun.quantity && i < getWorkers(); ++i) {
+            totalPoints += 2;
+        }
+    }
+    console.log(totalPoints);
+    return totalPoints;
 }
 
 function update () {
     if (money < 0) $("#money").css("color","red");
     else $("#money").css("color","white");
+
+    checkOptions();
+    checkActions();
+    updateObjects();
 
     // list objects
     var selector = $("#objects").html("");
@@ -121,10 +199,14 @@ function update () {
         if (actions[key].active) selector.append(insertAction(key));
     });
 
-    // list options
+    // list jobs
+    selector.append("~~JOBS~~");
 
-    checkOptions();
-    checkActions();
+    $.each(actions.jobs, function(key, value) {
+        if (actions.jobs[key].active) selector.append(insertJob(key));
+    });
+
+    // list options
 
     selector = $("#options").html("");
     $.each(options, function(key, value) {
@@ -158,6 +240,20 @@ function perform(key) {
 
     actions[key].special(key);
 }
+
+function performJob (key){
+    var time = actions.jobs[key].value;
+
+    while(time > 0) {
+        update();
+        time -= 0.25;
+    }
+
+    karma += actions.jobs[key].repercussion;
+    actions.jobs[key].special(key);
+    money += actions.jobs[key].salary;
+}
+
 function end () {
     showToast("YOU DIEDED");
 }
@@ -209,8 +305,22 @@ $(document).ready(function(){
     });
 
 
-    $(document).on('click', '#actions div', function() {
+    $(document).on('click', '#actions .action', function() {
         perform($(this).attr('value'));
+
+        if(objects.bookOfAutomation.active=false) {
+            if (isAppening(5)) {
+                objects.bookOfAutomation.active=true;
+                objects.bookOfAutomation.quantity = 1;
+                addContentToTerminal("You find a book named Book of Automation, you read it and you learn how to do " +
+                    "things automatically. You will need the book in order to don't forget this knowledge");
+            }
+        }
+        update();
+    });
+
+    $(document).on('click', '#actions .job', function() {
+        performJob($(this).attr('value'));
 
         if(objects.bookOfAutomation.active=false) {
             if (isAppening(5)) {
